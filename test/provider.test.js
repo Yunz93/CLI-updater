@@ -142,6 +142,7 @@ test("provider preserves latest version lookup errors without failing the whole 
 
 test("provider falls back to npm global package version when CLI version command fails", async () => {
   const provider = makeProvider({
+    resolveExecutable: async () => "/opt/homebrew/lib/node_modules/@example/sample/bin/sample.js",
     runCommand: async (command) => {
       if (command === "npm") {
         return {
@@ -183,6 +184,225 @@ test("provider exposes an update plan without executing it", () => {
   assert.deepEqual(plan.commands, [["npm", "install", "-g", "@example/sample@latest"]]);
   assert.equal(plan.canExecute, true);
   assert.equal(plan.requiresConfirmation, true);
+});
+
+test("provider enables codex self-update for standalone installs even when npm-global exists", async () => {
+  const provider = createNpmCliProvider({
+    id: "codex",
+    aliases: ["codex"],
+    displayName: "Codex CLI",
+    executable: "codex",
+    packageName: "@openai/codex",
+    versionArgsList: [["--version"]],
+    updateCommand: ["npm", "install", "-g", "@openai/codex@latest"],
+    selfUpdateCommand: ["codex", "update"]
+  }, {
+    resolveExecutable: async () => "/Users/example/.codex/packages/standalone/current/codex",
+    resolveAllExecutables: async () => ["/Users/example/.codex/packages/standalone/current/codex"],
+    getNpmLatestVersion: async () => ({
+      ok: true,
+      version: "0.132.0",
+      error: null
+    }),
+    runCommand: async (command, args) => {
+      if (command === "npm") {
+        return {
+          ok: true,
+          code: 0,
+          stdout: JSON.stringify({
+            dependencies: { "@openai/codex": { version: "0.132.0" } }
+          }),
+          stderr: "",
+          error: null
+        };
+      }
+
+      if (command === "/Users/example/.codex/packages/standalone/current/codex" && args[0] === "--version") {
+        return {
+          ok: true,
+          code: 0,
+          stdout: "codex-cli 0.132.0",
+          stderr: "",
+          error: null
+        };
+      }
+
+      if (command === "/Users/example/.codex/packages/standalone/current/codex" && args[0] === "update") {
+        return {
+          ok: true,
+          code: 0,
+          stdout: "Update Codex to the latest version",
+          stderr: "",
+          error: null
+        };
+      }
+
+      return {
+        ok: false,
+        code: 1,
+        stdout: "",
+        stderr: "",
+        error: "unexpected command"
+      };
+    }
+  });
+
+  const result = await provider.check();
+  assert.equal(result.installSource, "self-update");
+  assert.equal(result.status, "up_to_date");
+
+  const plan = provider.getUpdatePlan(result);
+  assert.equal(plan.strategy, "self-update");
+  assert.deepEqual(plan.commands, [["/Users/example/.codex/packages/standalone/current/codex", "update"]]);
+});
+
+test("provider enables codex self-update for Codex.app bundle installs", async () => {
+  const provider = createNpmCliProvider({
+    id: "codex",
+    aliases: ["codex"],
+    displayName: "Codex CLI",
+    executable: "codex",
+    packageName: "@openai/codex",
+    versionArgsList: [["--version"]],
+    updateCommand: ["npm", "install", "-g", "@openai/codex@latest"],
+    selfUpdateCommand: ["codex", "update"]
+  }, {
+    resolveExecutable: async () => "/Applications/Codex.app/Contents/Resources/codex",
+    resolveAllExecutables: async () => ["/Applications/Codex.app/Contents/Resources/codex"],
+    getNpmLatestVersion: async () => ({
+      ok: true,
+      version: "0.132.0",
+      error: null
+    }),
+    runCommand: async (command, args) => {
+      if (command === "npm") {
+        return {
+          ok: true,
+          code: 0,
+          stdout: JSON.stringify({ name: "lib" }),
+          stderr: "",
+          error: null
+        };
+      }
+
+      if (command === "/Applications/Codex.app/Contents/Resources/codex" && args[0] === "--version") {
+        return {
+          ok: true,
+          code: 0,
+          stdout: "codex-cli 0.131.0-alpha.9",
+          stderr: "",
+          error: null
+        };
+      }
+
+      if (command === "/Applications/Codex.app/Contents/Resources/codex" && args[0] === "update") {
+        return {
+          ok: true,
+          code: 0,
+          stdout: "Update Codex to the latest version",
+          stderr: "",
+          error: null
+        };
+      }
+
+      return {
+        ok: false,
+        code: 1,
+        stdout: "",
+        stderr: "",
+        error: "unexpected command"
+      };
+    }
+  });
+
+  const result = await provider.check();
+  assert.equal(result.installSource, "self-update");
+  assert.equal(result.status, "update_available");
+
+  const plan = provider.getUpdatePlan(result);
+  assert.equal(plan.strategy, "self-update");
+  assert.equal(plan.canExecute, true);
+  assert.deepEqual(plan.commands, [["/Applications/Codex.app/Contents/Resources/codex", "update"]]);
+});
+
+test("provider warns when multiple codex installations have different versions", async () => {
+  const provider = createNpmCliProvider({
+    id: "codex",
+    aliases: ["codex"],
+    displayName: "Codex CLI",
+    executable: "codex",
+    packageName: "@openai/codex",
+    versionArgsList: [["--version"]],
+    updateCommand: ["npm", "install", "-g", "@openai/codex@latest"],
+    selfUpdateCommand: ["codex", "update"],
+    warnMultipleExecutables: true
+  }, {
+    resolveExecutable: async () => "/Applications/Codex.app/Contents/Resources/codex",
+    resolveAllExecutables: async () => [
+      "/Applications/Codex.app/Contents/Resources/codex",
+      "/Users/example/.local/bin/codex"
+    ],
+    getNpmLatestVersion: async () => ({
+      ok: true,
+      version: "0.132.0",
+      error: null
+    }),
+    runCommand: async (command, args) => {
+      if (command === "npm") {
+        return {
+          ok: true,
+          code: 0,
+          stdout: JSON.stringify({ name: "lib" }),
+          stderr: "",
+          error: null
+        };
+      }
+
+      if (command === "/Applications/Codex.app/Contents/Resources/codex" && args[0] === "update") {
+        return {
+          ok: true,
+          code: 0,
+          stdout: "Update Codex to the latest version",
+          stderr: "",
+          error: null
+        };
+      }
+
+      if (command === "/Applications/Codex.app/Contents/Resources/codex") {
+        return {
+          ok: true,
+          code: 0,
+          stdout: "codex-cli 0.131.0-alpha.9",
+          stderr: "",
+          error: null
+        };
+      }
+
+      if (command === "/Users/example/.local/bin/codex") {
+        return {
+          ok: true,
+          code: 0,
+          stdout: "codex-cli 0.132.0",
+          stderr: "",
+          error: null
+        };
+      }
+
+      return {
+        ok: false,
+        code: 1,
+        stdout: "",
+        stderr: "",
+        error: "unexpected command"
+      };
+    }
+  });
+
+  const result = await provider.check();
+  assert.equal(
+    result.errors.some((error) => error.source === "multiple_installations"),
+    true
+  );
 });
 
 test("provider enables self-update when native installer exposes update command", async () => {
@@ -250,7 +470,7 @@ test("provider enables self-update when native installer exposes update command"
   const plan = provider.getUpdatePlan(result);
   assert.equal(plan.strategy, "self-update");
   assert.equal(plan.canExecute, true);
-  assert.deepEqual(plan.commands, [["claude", "update"]]);
+  assert.deepEqual(plan.commands, [["/Users/example/.local/bin/claude", "update"]]);
 });
 
 test("provider disables automatic update for unknown install source", () => {

@@ -59,6 +59,14 @@ function formatResultLine(result) {
   const latest = result.latestVersion ?? "unknown";
 
   if (result.installSource === "self-update") {
+    if (result.status === "update_available") {
+      return `${result.name.padEnd(12)} ${current} -> ${latest}    update available`;
+    }
+
+    if (result.status === "up_to_date") {
+      return `${result.name.padEnd(12)} ${current}             up to date`;
+    }
+
     return `${result.name.padEnd(12)} ${current}             self-update managed`;
   }
 

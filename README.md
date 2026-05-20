@@ -93,7 +93,7 @@ agent-cli-updater update codex --yes
 
 | Provider | Executable | Latest version source | Update command |
 | --- | --- | --- | --- |
-| Codex CLI | `codex` | `@openai/codex` npm package | `npm install -g @openai/codex@latest` |
+| Codex CLI | `codex` | `@openai/codex` npm package | `codex update` for standalone or Codex.app installs, or `npm install -g @openai/codex@latest` |
 | Claude Code | `claude` | `@anthropic-ai/claude-code` npm package | `claude update` for native installs, or `npm install -g @anthropic-ai/claude-code@latest` |
 | Gemini CLI | `gemini` | `@google/gemini-cli` npm package | `npm install -g @google/gemini-cli@latest` |
 | Cursor CLI | `cursor-agent` | Cursor self-update command | `cursor-agent update` |
@@ -127,7 +127,7 @@ The provider architecture lives in `src/providers`. Shared version comparison, c
 GitHub Actions workflows:
 
 - `CI` runs `npm test` and `npm run pack:check` on pushes and pull requests to `main` (Node 18, 20, 22).
-- `Release` publishes `agent-cli-updater` to npm and creates a GitHub Release when a version tag such as `v0.4.6` is pushed.
+- `Release` publishes `agent-cli-updater` to npm and creates a GitHub Release when a version tag such as `v0.4.7` is pushed.
 
 Before the first automated release:
 

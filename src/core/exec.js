@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { constants } from "node:fs";
-import { access } from "node:fs/promises";
+import { access, realpath } from "node:fs/promises";
 import path from "node:path";
 
 const WINDOWS_EXTENSIONS = [".EXE", ".CMD", ".BAT", ".COM"];
@@ -29,6 +29,29 @@ export async function resolveExecutable(command, env = process.env) {
   }
 
   return null;
+}
+
+export async function resolveAllExecutables(command, env = process.env) {
+  const pathValue = env.PATH ?? "";
+  const directories = pathValue.split(path.delimiter).filter(Boolean);
+  const seen = new Set();
+  const results = [];
+
+  for (const directory of directories) {
+    const candidate = path.join(directory, command);
+    try {
+      await access(candidate, constants.X_OK);
+      const resolved = await realpath(candidate);
+      if (!seen.has(resolved)) {
+        seen.add(resolved);
+        results.push(resolved);
+      }
+    } catch {
+      // Keep scanning PATH.
+    }
+  }
+
+  return results;
 }
 
 export function runCommand(command, args = [], options = {}) {

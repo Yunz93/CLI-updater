@@ -1,10 +1,11 @@
-import { resolveExecutable, runCommand } from "../core/exec.js";
+import { resolveAllExecutables, resolveExecutable, runCommand } from "../core/exec.js";
 import { getNpmLatestVersion } from "../core/npmRegistry.js";
 import { getPyPiLatestVersion } from "../core/pypiRegistry.js";
 import { createNpmCliProvider, createPyPiCliProvider, createSelfUpdatingCliProvider } from "./factory.js";
 
 const dependencies = {
   resolveExecutable,
+  resolveAllExecutables,
   runCommand,
   getNpmLatestVersion,
   getPyPiLatestVersion
@@ -18,7 +19,9 @@ export const providers = [
     executable: "codex",
     packageName: "@openai/codex",
     versionArgsList: [["--version"], ["-V"]],
-    updateCommand: ["npm", "install", "-g", "@openai/codex@latest"]
+    updateCommand: ["npm", "install", "-g", "@openai/codex@latest"],
+    selfUpdateCommand: ["codex", "update"],
+    warnMultipleExecutables: true
   }, dependencies),
   createNpmCliProvider({
     id: "claude",

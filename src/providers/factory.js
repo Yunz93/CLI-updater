@@ -1,8 +1,10 @@
+import { realpath } from "node:fs/promises";
 import { parseVersion, statusFromVersions } from "../core/semver.js";
 
 export function createNpmCliProvider(config, dependencies) {
   const {
     resolveExecutable,
+    resolveAllExecutables,
     runCommand,
     getNpmLatestVersion
   } = dependencies;
@@ -36,12 +38,32 @@ export function createNpmCliProvider(config, dependencies) {
       let current = await readCurrentVersion(config, executablePath, runCommand);
       const latest = await getNpmLatestVersion(config.packageName);
       const npmPackage = await inferNpmGlobalPackage(config.packageName, runCommand);
-      const installSource = npmPackage.source === "npm-global"
-        ? npmPackage.source
-        : await inferSelfUpdateInstallSource(executablePath, config, runCommand);
+      const executableKind = await classifyNpmCliExecutable(executablePath, config.packageName);
+      const installSource = await inferNpmCliInstallSource(
+        executablePath,
+        executableKind,
+        config,
+        npmPackage,
+        runCommand
+      );
       const errors = [];
 
-      if (!current.ok && npmPackage.version) {
+      if (config.warnMultipleExecutables && resolveAllExecutables) {
+        const conflictMessage = await discoverExecutableConflicts(
+          config,
+          executablePath,
+          resolveAllExecutables,
+          runCommand
+        );
+        if (conflictMessage) {
+          errors.push({
+            source: "multiple_installations",
+            message: conflictMessage
+          });
+        }
+      }
+
+      if (!current.ok && npmPackage.version && executableKind === "npm-global") {
         current = {
           ok: true,
           version: npmPackage.version,
@@ -89,7 +111,7 @@ export function createNpmCliProvider(config, dependencies) {
       const isSelfUpdate = installSource === "self-update";
       const canExecute = isNpmGlobal || isSelfUpdate;
       const commands = isSelfUpdate
-        ? [config.selfUpdateCommand]
+        ? [[checkResult.path ?? config.executable, "update"]]
         : [config.updateCommand];
       const strategy = isNpmGlobal ? "npm-global" : isSelfUpdate ? "self-update" : "manual";
       const runCommandText = commands[0].join(" ");
@@ -332,6 +354,91 @@ async function readCurrentVersion(config, executablePath, runCommand) {
     version: null,
     error: rawOutputs.filter(Boolean).join(" | ") || "No version output could be parsed"
   };
+}
+
+async function classifyNpmCliExecutable(executablePath, packageName) {
+  let normalized = executablePath.replaceAll("\\", "/");
+
+  try {
+    normalized = (await realpath(executablePath)).replaceAll("\\", "/");
+  } catch {
+    // Keep the unresolved path when realpath fails.
+  }
+
+  if (normalized.includes(`/node_modules/${packageName}/`)) {
+    return "npm-global";
+  }
+
+  if (normalized.includes("/.codex/packages/standalone/")) {
+    return "standalone";
+  }
+
+  if (normalized.includes("/Codex.app/Contents/Resources/")) {
+    return "app-bundle";
+  }
+
+  return "unknown";
+}
+
+async function inferNpmCliInstallSource(
+  executablePath,
+  executableKind,
+  config,
+  npmPackage,
+  runCommand
+) {
+  if (executableKind === "npm-global") {
+    return "npm-global";
+  }
+
+  if (executableKind === "standalone" || executableKind === "app-bundle") {
+    return inferSelfUpdateInstallSource(executablePath, config, runCommand);
+  }
+
+  if (npmPackage.source === "npm-global") {
+    return "npm-global";
+  }
+
+  return inferSelfUpdateInstallSource(executablePath, config, runCommand);
+}
+
+async function discoverExecutableConflicts(config, activePath, resolveAllExecutables, runCommand) {
+  const paths = await resolveAllExecutables(config.executable);
+  if (paths.length <= 1) {
+    return null;
+  }
+
+  const activeResolved = await resolveExecutablePath(activePath);
+  const installations = [];
+  for (const executablePath of paths) {
+    const current = await readCurrentVersion(config, executablePath, runCommand);
+    if (current.version) {
+      installations.push({
+        path: executablePath,
+        resolvedPath: await resolveExecutablePath(executablePath),
+        version: current.version
+      });
+    }
+  }
+
+  const versions = new Set(installations.map((installation) => installation.version));
+  if (versions.size <= 1) {
+    return null;
+  }
+
+  const others = installations
+    .filter((installation) => installation.resolvedPath !== activeResolved)
+    .map((installation) => `${installation.path} (${installation.version})`);
+
+  return `Multiple ${config.executable} installations on PATH have different versions. Others: ${others.join(", ")}.`;
+}
+
+async function resolveExecutablePath(executablePath) {
+  try {
+    return await realpath(executablePath);
+  } catch {
+    return executablePath;
+  }
 }
 
 async function inferSelfUpdateInstallSource(executablePath, config, runCommand) {

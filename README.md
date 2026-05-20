@@ -94,7 +94,7 @@ agent-cli-updater update codex --yes
 | Provider | Executable | Latest version source | Update command |
 | --- | --- | --- | --- |
 | Codex CLI | `codex` | `@openai/codex` npm package | `npm install -g @openai/codex@latest` |
-| Claude Code | `claude` | `@anthropic-ai/claude-code` npm package | `npm install -g @anthropic-ai/claude-code@latest` |
+| Claude Code | `claude` | `@anthropic-ai/claude-code` npm package | `claude update` for native installs, or `npm install -g @anthropic-ai/claude-code@latest` |
 | Gemini CLI | `gemini` | `@google/gemini-cli` npm package | `npm install -g @google/gemini-cli@latest` |
 | Cursor CLI | `cursor-agent` | Cursor self-update command | `cursor-agent update` |
 | Kimi CLI | `kimi` | `kimi-cli` PyPI package | `uv tool upgrade kimi-cli` for uv-managed installs |

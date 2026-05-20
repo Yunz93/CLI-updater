@@ -185,6 +185,74 @@ test("provider exposes an update plan without executing it", () => {
   assert.equal(plan.requiresConfirmation, true);
 });
 
+test("provider enables self-update when native installer exposes update command", async () => {
+  const provider = createNpmCliProvider({
+    id: "claude",
+    aliases: ["claude"],
+    displayName: "Claude Code",
+    executable: "claude",
+    packageName: "@anthropic-ai/claude-code",
+    versionArgsList: [["--version"]],
+    updateCommand: ["npm", "install", "-g", "@anthropic-ai/claude-code@latest"],
+    selfUpdateCommand: ["claude", "update"]
+  }, {
+    resolveExecutable: async () => "/Users/example/.local/bin/claude",
+    getNpmLatestVersion: async () => ({
+      ok: true,
+      version: "2.1.145",
+      error: null
+    }),
+    runCommand: async (command, args) => {
+      if (command === "npm") {
+        return {
+          ok: true,
+          code: 0,
+          stdout: JSON.stringify({ name: "lib" }),
+          stderr: "",
+          error: null
+        };
+      }
+
+      if (command === "/Users/example/.local/bin/claude" && args[0] === "--version") {
+        return {
+          ok: true,
+          code: 0,
+          stdout: "2.1.144 (Claude Code)",
+          stderr: "",
+          error: null
+        };
+      }
+
+      if (command === "/Users/example/.local/bin/claude" && args[0] === "update") {
+        return {
+          ok: true,
+          code: 0,
+          stdout: "Usage: claude update|upgrade [options]",
+          stderr: "",
+          error: null
+        };
+      }
+
+      return {
+        ok: false,
+        code: 1,
+        stdout: "",
+        stderr: "",
+        error: "unexpected command"
+      };
+    }
+  });
+
+  const result = await provider.check();
+  assert.equal(result.installSource, "self-update");
+  assert.equal(result.status, "update_available");
+
+  const plan = provider.getUpdatePlan(result);
+  assert.equal(plan.strategy, "self-update");
+  assert.equal(plan.canExecute, true);
+  assert.deepEqual(plan.commands, [["claude", "update"]]);
+});
+
 test("provider disables automatic update for unknown install source", () => {
   const provider = makeProvider();
 

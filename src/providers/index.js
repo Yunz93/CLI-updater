@@ -27,7 +27,8 @@ export const providers = [
     executable: "claude",
     packageName: "@anthropic-ai/claude-code",
     versionArgsList: [["--version"], ["-v"]],
-    updateCommand: ["npm", "install", "-g", "@anthropic-ai/claude-code@latest"]
+    updateCommand: ["npm", "install", "-g", "@anthropic-ai/claude-code@latest"],
+    selfUpdateCommand: ["claude", "update"]
   }, dependencies)
   ,
   createNpmCliProvider({

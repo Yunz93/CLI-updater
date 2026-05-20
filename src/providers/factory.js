@@ -36,7 +36,9 @@ export function createNpmCliProvider(config, dependencies) {
       let current = await readCurrentVersion(config, executablePath, runCommand);
       const latest = await getNpmLatestVersion(config.packageName);
       const npmPackage = await inferNpmGlobalPackage(config.packageName, runCommand);
-      const installSource = npmPackage.source;
+      const installSource = npmPackage.source === "npm-global"
+        ? npmPackage.source
+        : await inferSelfUpdateInstallSource(executablePath, config, runCommand);
       const errors = [];
 
       if (!current.ok && npmPackage.version) {
@@ -82,25 +84,31 @@ export function createNpmCliProvider(config, dependencies) {
     },
 
     getUpdatePlan(checkResult) {
-      const commands = [config.updateCommand];
-      const canExecute = checkResult.installSource === "npm-global";
+      const installSource = checkResult.installSource;
+      const isNpmGlobal = installSource === "npm-global";
+      const isSelfUpdate = installSource === "self-update";
+      const canExecute = isNpmGlobal || isSelfUpdate;
+      const commands = isSelfUpdate
+        ? [config.selfUpdateCommand]
+        : [config.updateCommand];
+      const strategy = isNpmGlobal ? "npm-global" : isSelfUpdate ? "self-update" : "manual";
+      const runCommandText = commands[0].join(" ");
+
       return {
         id: config.id,
         name: config.displayName,
         currentVersion: checkResult.currentVersion,
         targetVersion: checkResult.latestVersion,
-        strategy: canExecute ? "npm-global" : "manual",
+        strategy,
         commands,
         timeoutMs: config.updateTimeoutMs,
         canExecute,
         requiresConfirmation: canExecute,
         manualInstructions: canExecute
-          ? `Run: ${config.updateCommand.join(" ")}`
+          ? `Run: ${runCommandText}`
           : `Installation source is unknown. Review the official installer or run manually: ${formatManualCommand(config)}`,
         riskNotes: [
-          canExecute
-            ? "This updates a globally installed npm package."
-            : "Automatic update is disabled because the install source could not be verified as npm-global.",
+          buildNpmProviderRiskNote(installSource),
           "The command may modify files outside this project.",
           ...(config.riskNotes ?? [])
         ]
@@ -324,6 +332,34 @@ async function readCurrentVersion(config, executablePath, runCommand) {
     version: null,
     error: rawOutputs.filter(Boolean).join(" | ") || "No version output could be parsed"
   };
+}
+
+async function inferSelfUpdateInstallSource(executablePath, config, runCommand) {
+  if (!config.selfUpdateCommand) {
+    return "unknown";
+  }
+
+  const result = await runCommand(executablePath, ["update", "--help"], {
+    timeoutMs: 5_000
+  });
+
+  if (result.ok) {
+    return "self-update";
+  }
+
+  return "unknown";
+}
+
+function buildNpmProviderRiskNote(installSource) {
+  if (installSource === "npm-global") {
+    return "This updates a globally installed npm package.";
+  }
+
+  if (installSource === "self-update") {
+    return "This runs the tool's official self-update command.";
+  }
+
+  return "Automatic update is disabled because the install source could not be verified as npm-global or self-update.";
 }
 
 async function inferNpmGlobalPackage(packageName, runCommand) {

@@ -28,7 +28,7 @@ No runtime npm dependencies are required.
 After the package is published:
 
 ```bash
-npm install -g @yunz93/cli-updater
+npm install -g agent-cli-updater
 ```
 
 From this repository:
@@ -40,19 +40,19 @@ npm install -g .
 After installation, run:
 
 ```bash
-cli-updater check
+agent-cli-updater check
 ```
 
 ## Usage
 
 ```bash
-cli-updater check
-cli-updater check codex
-cli-updater check claude
-cli-updater check --json
-cli-updater check --include-not-installed
-cli-updater list
-cli-updater doctor
+agent-cli-updater check
+agent-cli-updater check codex
+agent-cli-updater check claude
+agent-cli-updater check --json
+agent-cli-updater check --include-not-installed
+agent-cli-updater list
+agent-cli-updater doctor
 ```
 
 By default, `check` only shows tools that are installed. Use `--include-not-installed` to show every supported provider.
@@ -60,19 +60,19 @@ By default, `check` only shows tools that are installed. Use `--include-not-inst
 Preview an update command without changing the system:
 
 ```bash
-cli-updater update codex --dry-run
+agent-cli-updater update codex --dry-run
 ```
 
 Run an update only after explicit confirmation:
 
 ```bash
-cli-updater update codex
+agent-cli-updater update codex
 ```
 
 For scripted usage:
 
 ```bash
-cli-updater update codex --yes
+agent-cli-updater update codex --yes
 ```
 
 ## Exit Codes
@@ -120,9 +120,7 @@ The provider architecture lives in `src/providers`. Shared version comparison, c
 GitHub Actions workflows:
 
 - `CI` runs `npm test` and `npm run pack:check` on pushes and pull requests to `main` (Node 18, 20, 22).
-- `Release` publishes `@yunz93/cli-updater` to npm and creates a GitHub Release when a version tag such as `v0.4.4` is pushed.
-
-The unscoped name `cli-updater` is already taken on npm, so this project publishes under the `@yunz93` scope. The CLI command remains `cli-updater`.
+- `Release` publishes `agent-cli-updater` to npm and creates a GitHub Release when a version tag such as `v0.4.4` is pushed.
 
 Before the first automated release:
 

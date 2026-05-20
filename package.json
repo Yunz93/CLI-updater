@@ -1,13 +1,10 @@
 {
-  "name": "@yunz93/cli-updater",
+  "name": "agent-cli-updater",
   "version": "0.4.4",
-  "publishConfig": {
-    "access": "public"
-  },
   "description": "A CLI-first update manager for developer command-line tools.",
   "type": "module",
   "bin": {
-    "cli-updater": "./src/cli.js"
+    "agent-cli-updater": "./src/cli.js"
   },
   "files": [
     "src",

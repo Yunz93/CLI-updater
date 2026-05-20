@@ -14,10 +14,10 @@ function getHelp() {
   return `CLI Updater
 
 Usage:
-  cli-updater check [tool] [--json] [--include-not-installed]
-  cli-updater update <tool> [--dry-run] [--yes]
-  cli-updater list [--json]
-  cli-updater doctor [--json]
+  agent-cli-updater check [tool] [--json] [--include-not-installed]
+  agent-cli-updater update <tool> [--dry-run] [--yes]
+  agent-cli-updater list [--json]
+  agent-cli-updater doctor [--json]
 
 Tools:
 ${toolLines}
@@ -157,7 +157,7 @@ async function runDoctor(parsed, io) {
 
 async function runUpdate(parsed, io) {
   if (!parsed.tool) {
-    io.stderr.write("Missing tool. Usage: cli-updater update <tool> [--dry-run] [--yes]\n");
+    io.stderr.write("Missing tool. Usage: agent-cli-updater update <tool> [--dry-run] [--yes]\n");
     return 3;
   }
 

@@ -1,6 +1,6 @@
 {
   "name": "agent-cli-updater",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "description": "A CLI-first update manager for developer command-line tools.",
   "type": "module",
   "bin": {

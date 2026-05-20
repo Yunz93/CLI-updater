@@ -1,0 +1,31 @@
+{
+  "name": "cli-updater",
+  "version": "0.4.3",
+  "description": "A CLI-first update manager for developer command-line tools.",
+  "type": "module",
+  "bin": {
+    "cli-updater": "./src/cli.js"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "check": "node ./src/cli.js check --json",
+    "start": "node ./src/cli.js",
+    "pack:check": "npm pack --dry-run"
+  },
+  "keywords": [
+    "cli",
+    "updater",
+    "codex",
+    "claude-code",
+    "developer-tools"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

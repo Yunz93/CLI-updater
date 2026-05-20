@@ -28,7 +28,7 @@ No runtime npm dependencies are required.
 After the package is published:
 
 ```bash
-npm install -g cli-updater
+npm install -g @yunz93/cli-updater
 ```
 
 From this repository:
@@ -120,7 +120,9 @@ The provider architecture lives in `src/providers`. Shared version comparison, c
 GitHub Actions workflows:
 
 - `CI` runs `npm test` and `npm run pack:check` on pushes and pull requests to `main` (Node 18, 20, 22).
-- `Release` publishes to npm when a version tag such as `v0.4.4` is pushed.
+- `Release` publishes `@yunz93/cli-updater` to npm and creates a GitHub Release when a version tag such as `v0.4.4` is pushed.
+
+The unscoped name `cli-updater` is already taken on npm, so this project publishes under the `@yunz93` scope. The CLI command remains `cli-updater`.
 
 Before the first automated release:
 

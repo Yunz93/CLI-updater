@@ -1,0 +1,20 @@
+name: Deprecate Legacy Package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deprecate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org
+
+      - name: Deprecate @yunz93/cli-updater
+        run: |
+          npm deprecate @yunz93/cli-updater@"<0.5.0" \
+            "Renamed to agent-cli-updater. Run: npm install -g agent-cli-updater"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

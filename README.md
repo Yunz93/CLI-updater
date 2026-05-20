@@ -25,9 +25,16 @@ No runtime npm dependencies are required.
 
 ## Install
 
-After the package is published:
+```bash
+npm install -g agent-cli-updater
+```
+
+### Migrating from `@yunz93/cli-updater`
+
+The package was renamed to `agent-cli-updater`. The CLI command changed from `cli-updater` to `agent-cli-updater`.
 
 ```bash
+npm uninstall -g @yunz93/cli-updater
 npm install -g agent-cli-updater
 ```
 

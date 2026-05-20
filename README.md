@@ -114,3 +114,24 @@ npm run pack:check
 ```
 
 The provider architecture lives in `src/providers`. Shared version comparison, command execution, npm registry access, and output formatting live in `src/core`.
+
+## CI / Release
+
+GitHub Actions workflows:
+
+- `CI` runs `npm test` and `npm run pack:check` on pushes and pull requests to `main` (Node 18, 20, 22).
+- `Release` publishes to npm when a version tag such as `v0.4.4` is pushed.
+
+Before the first automated release:
+
+1. Create an npm access token with publish rights.
+2. Add it to the GitHub repository as `NPM_TOKEN` (`Settings` → `Secrets and variables` → `Actions`).
+
+Publish a new version:
+
+```bash
+npm version patch   # or minor / major
+git push origin main --tags
+```
+
+The release workflow checks that the tag (without the `v` prefix) matches `package.json`, runs tests, then runs `npm publish --provenance`.

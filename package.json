@@ -11,11 +11,20 @@
     "README.md",
     "LICENSE"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yunz93/CLI-updater.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Yunz93/CLI-updater/issues"
+  },
+  "homepage": "https://github.com/Yunz93/CLI-updater#readme",
   "scripts": {
     "test": "node --test",
     "check": "node ./src/cli.js check --json",
     "start": "node ./src/cli.js",
-    "pack:check": "npm pack --dry-run"
+    "pack:check": "npm pack --dry-run",
+    "prepublishOnly": "npm test"
   },
   "keywords": [
     "cli",

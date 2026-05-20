@@ -1,5 +1,5 @@
 export function formatCheckResults(results) {
-  const lines = ["CLI Updater", ""];
+  const lines = ["Agent CLI Updater", ""];
 
   for (const result of results) {
     lines.push(formatResultLine(result));

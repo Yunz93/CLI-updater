@@ -11,7 +11,7 @@ function getHelp() {
     return `  ${provider.id.padEnd(12)} ${provider.displayName}`;
   }).join("\n");
 
-  return `CLI Updater
+  return `Agent CLI Updater
 
 Usage:
   agent-cli-updater check [tool] [--json] [--include-not-installed]
@@ -147,7 +147,7 @@ async function runDoctor(parsed, io) {
   if (parsed.flags.json) {
     io.stdout.write(formatJson({ checks }));
   } else {
-    io.stdout.write(`CLI Updater Doctor\n\n${checks.map((check) => {
+    io.stdout.write(`Agent CLI Updater Doctor\n\n${checks.map((check) => {
       return `${check.name.padEnd(10)} ${check.ok ? "ok" : "error"}    ${check.detail}`;
     }).join("\n")}\n`);
   }

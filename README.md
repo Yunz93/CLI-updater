@@ -1,6 +1,6 @@
-# CLI Updater
+# Agent CLI Updater
 
-CLI Updater is a command-line update manager for developer CLI tools.
+Agent CLI Updater is a command-line update manager for developer CLI tools.
 
 The MVP focuses on AI coding CLIs:
 
@@ -104,7 +104,7 @@ agent-cli-updater update codex --yes
 | GitHub Copilot CLI | `copilot` | `@github/copilot` npm package | `npm install -g @github/copilot@latest` |
 | Aider | `aider` | `aider-chat` PyPI package | `pipx upgrade aider-chat` for pipx-managed installs |
 
-Automatic update execution is only enabled when CLI Updater can verify a safe update path. For example, npm-backed tools must be found in `npm list -g`, Python tools must be found in `pipx list --json` or `uv tool list --show-paths`, and Cursor uses its official `cursor-agent update` self-update command. Otherwise, CLI Updater reports the status and prints manual update guidance.
+Automatic update execution is only enabled when Agent CLI Updater can verify a safe update path. For example, npm-backed tools must be found in `npm list -g`, Python tools must be found in `pipx list --json` or `uv tool list --show-paths`, and Cursor uses its official `cursor-agent update` self-update command. Otherwise, Agent CLI Updater reports the status and prints manual update guidance.
 
 ## Development
 

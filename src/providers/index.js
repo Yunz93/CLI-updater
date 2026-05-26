@@ -21,7 +21,11 @@ export const providers = [
     versionArgsList: [["--version"], ["-V"]],
     updateCommand: ["npm", "install", "-g", "@openai/codex@latest"],
     selfUpdateCommand: ["codex", "update"],
-    warnMultipleExecutables: true
+    allowFallbackUpdate: true,
+    warnMultipleExecutables: true,
+    riskNotes: [
+      "Codex may require restarting the active shell if another installation shadows the npm binary."
+    ]
   }, dependencies),
   createNpmCliProvider({
     id: "claude",
@@ -31,9 +35,11 @@ export const providers = [
     packageName: "@anthropic-ai/claude-code",
     versionArgsList: [["--version"], ["-v"]],
     updateCommand: ["npm", "install", "-g", "@anthropic-ai/claude-code@latest"],
-    selfUpdateCommand: ["claude", "update"]
-  }, dependencies)
-  ,
+    selfUpdateCommand: ["claude", "update"],
+    riskNotes: [
+      "Claude Code updates are executed through npm for verified npm-global installs."
+    ]
+  }, dependencies),
   createNpmCliProvider({
     id: "gemini",
     aliases: ["gemini", "gemini-cli"],
@@ -65,7 +71,7 @@ export const providers = [
       "uv-tool": ["uv", "tool", "upgrade", "kimi-cli"]
     },
     updateTimeoutMs: 900_000,
-    manualUpdateCommand: ["uv", "tool", "install", "--python", "3.13", "kimi-cli"],
+    manualUpdateCommand: ["sh", "-c", "curl -LsSf https://code.kimi.com/install.sh | bash"],
     riskNotes: [
       "Kimi CLI is currently documented as a technical preview for macOS and Linux."
     ]
@@ -77,7 +83,8 @@ export const providers = [
     executable: "qwen",
     packageName: "@qwen-code/qwen-code",
     versionArgsList: [["--version"], ["-v"]],
-    updateCommand: ["npm", "install", "-g", "@qwen-code/qwen-code@latest"]
+    updateCommand: ["npm", "install", "-g", "@qwen-code/qwen-code@latest"],
+    manualUpdateCommand: ["sh", "-c", "curl -fsSL https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen.sh | bash"]
   }, dependencies),
   createNpmCliProvider({
     id: "opencode",
@@ -86,7 +93,8 @@ export const providers = [
     executable: "opencode",
     packageName: "opencode-ai",
     versionArgsList: [["--version"], ["version"], ["-v"]],
-    updateCommand: ["npm", "install", "-g", "opencode-ai@latest"]
+    updateCommand: ["npm", "install", "-g", "opencode-ai@latest"],
+    manualUpdateCommand: ["sh", "-c", "curl -fsSL https://opencode.ai/install | bash"]
   }, dependencies),
   createNpmCliProvider({
     id: "amp",
@@ -109,6 +117,7 @@ export const providers = [
     packageName: "@github/copilot",
     versionArgsList: [["--version"], ["version"], ["-v"]],
     updateCommand: ["npm", "install", "-g", "@github/copilot@latest"],
+    manualUpdateCommand: ["sh", "-c", "curl -fsSL https://gh.io/copilot-install | bash"],
     riskNotes: [
       "GitHub Copilot CLI requires Node.js 22 or later when installed through npm."
     ]
@@ -125,7 +134,7 @@ export const providers = [
       "pipx": ["pipx", "upgrade", "aider-chat"],
       "uv-tool": ["uv", "tool", "upgrade", "aider-chat"]
     },
-    manualUpdateCommand: ["pipx", "upgrade", "aider-chat"]
+    manualUpdateCommand: ["sh", "-c", "curl -LsSf https://aider.chat/install.sh | sh"]
   }, dependencies)
 ];
 

@@ -1,8 +1,15 @@
 # Agent CLI Updater
 
-Agent CLI Updater is a command-line update manager for developer CLI tools.
+Agent CLI Updater helps you check and update AI coding command-line tools from one place.
 
-The MVP focuses on AI coding CLIs:
+It is built for developers who use several AI CLIs and want a quick answer to:
+
+- Which tools are installed?
+- Which versions are currently installed?
+- Which tools have updates available?
+- What command will be used before an update runs?
+
+## Supported Tools
 
 - Codex CLI
 - Claude Code
@@ -14,8 +21,6 @@ The MVP focuses on AI coding CLIs:
 - Amp
 - GitHub Copilot CLI
 - Aider
-
-It detects whether each CLI is installed, reads the local version, queries the latest package registry version, compares versions, and reports whether an update is available.
 
 ## Requirements
 
@@ -38,107 +43,63 @@ npm uninstall -g @yunz93/cli-updater
 npm install -g agent-cli-updater
 ```
 
-From this repository:
-
-```bash
-npm install -g .
-```
-
-After installation, run:
-
-```bash
-agent-cli-updater check
-```
-
 ## Usage
 
+Check installed tools:
+
 ```bash
 agent-cli-updater check
-agent-cli-updater check codex
-agent-cli-updater check claude
-agent-cli-updater check --json
-agent-cli-updater check --include-not-installed
-agent-cli-updater list
-agent-cli-updater doctor
 ```
 
-By default, `check` only shows tools that are installed. Use `--include-not-installed` to show every supported provider.
+Check one tool:
 
-Preview an update command without changing the system:
+```bash
+agent-cli-updater check codex
+agent-cli-updater check claude
+```
+
+Show all supported tools:
+
+```bash
+agent-cli-updater check --include-not-installed
+```
+
+List supported tools:
+
+```bash
+agent-cli-updater list
+```
+
+Preview an update:
 
 ```bash
 agent-cli-updater update codex --dry-run
 ```
 
-Run an update only after explicit confirmation:
+Run an update:
 
 ```bash
 agent-cli-updater update codex
 ```
 
-For scripted usage:
+Use JSON output:
 
 ```bash
-agent-cli-updater update codex --yes
+agent-cli-updater check --json
+agent-cli-updater update codex --dry-run --json
 ```
+
+`update --json` writes one JSON object that includes the pre-update check, plan, and post-update verification when an update runs.
+
+## Update Safety
+
+Updates are shown before they run.
+
+By default, Agent CLI Updater asks for confirmation before executing an update command. If it cannot safely determine how a tool should be updated, it will not run the update automatically and will show manual guidance instead.
 
 ## Exit Codes
 
-- `0`: command completed successfully, no update detected
+- `0`: completed successfully
 - `1`: command failed
-- `2`: update available
-- `3`: argument or command error
-
-## Supported Providers
-
-| Provider | Executable | Latest version source | Update command |
-| --- | --- | --- | --- |
-| Codex CLI | `codex` | `@openai/codex` npm package | `codex update` for standalone or Codex.app installs, or `npm install -g @openai/codex@latest` |
-| Claude Code | `claude` | `@anthropic-ai/claude-code` npm package | `claude update` for native installs, or `npm install -g @anthropic-ai/claude-code@latest` |
-| Gemini CLI | `gemini` | `@google/gemini-cli` npm package | `npm install -g @google/gemini-cli@latest` |
-| Cursor CLI | `cursor-agent` | Cursor self-update command | `cursor-agent update` |
-| Kimi CLI | `kimi` | `kimi-cli` PyPI package | `uv tool upgrade kimi-cli` for uv-managed installs |
-| Qwen Code | `qwen` | `@qwen-code/qwen-code` npm package | `npm install -g @qwen-code/qwen-code@latest` |
-| OpenCode | `opencode` | `opencode-ai` npm package | `npm install -g opencode-ai@latest` |
-| Amp | `amp` | `@ampcode/cli` npm package | `npm install -g @ampcode/cli@latest` for npm-managed installs |
-| GitHub Copilot CLI | `copilot` | `@github/copilot` npm package | `npm install -g @github/copilot@latest` |
-| Aider | `aider` | `aider-chat` PyPI package | `pipx upgrade aider-chat` for pipx-managed installs |
-
-Automatic update execution is only enabled when Agent CLI Updater can verify a safe update path. For example, npm-backed tools must be found in `npm list -g`, Python tools must be found in `pipx list --json` or `uv tool list --show-paths`, and Cursor uses its official `cursor-agent update` self-update command. Otherwise, Agent CLI Updater reports the status and prints manual update guidance.
-
-## Development
-
-Run tests:
-
-```bash
-npm test
-```
-
-Check the npm package contents:
-
-```bash
-npm run pack:check
-```
-
-The provider architecture lives in `src/providers`. Shared version comparison, command execution, npm registry access, and output formatting live in `src/core`.
-
-## CI / Release
-
-GitHub Actions workflows:
-
-- `CI` runs `npm test` and `npm run pack:check` on pushes and pull requests to `main` (Node 18, 20, 22).
-- `Release` publishes `agent-cli-updater` to npm and creates a GitHub Release when a version tag such as `v0.4.7` is pushed.
-
-Before the first automated release:
-
-1. Create an npm access token with publish rights.
-2. Add it to the GitHub repository as `NPM_TOKEN` (`Settings` → `Secrets and variables` → `Actions`).
-
-Publish a new version:
-
-```bash
-npm version patch   # or minor / major
-git push origin main --tags
-```
-
-The release workflow checks that the tag (without the `v` prefix) matches `package.json`, runs tests, then runs `npm publish --provenance`.
+- `2`: update available, or an update ran but the active executable still appears outdated
+- `3`: invalid command or argument

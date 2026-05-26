@@ -107,3 +107,187 @@ test("filterCheckResults keeps not installed tools when requested or targeted", 
     flags: { includeNotInstalled: false }
   }), results);
 });
+
+test("update --yes executes plan command and performs post-update verification", async () => {
+  const io = createIo();
+  const checkResults = [
+    {
+      id: "sample",
+      name: "Sample CLI",
+      installed: true,
+      currentVersion: "1.0.0",
+      latestVersion: "1.1.0",
+      status: "update_available",
+      errors: []
+    },
+    {
+      id: "sample",
+      name: "Sample CLI",
+      installed: true,
+      currentVersion: "1.1.0",
+      latestVersion: "1.1.0",
+      status: "up_to_date",
+      errors: []
+    }
+  ];
+  let checkIndex = 0;
+  const calls = [];
+  const provider = {
+    displayName: "Sample CLI",
+    check: async () => checkResults[checkIndex++],
+    getUpdatePlan: (checkResult) => ({
+      id: "sample",
+      name: "Sample CLI",
+      currentVersion: checkResult.currentVersion,
+      targetVersion: checkResult.latestVersion,
+      strategy: "npm-global",
+      commands: [["npm", "install", "-g", "@example/sample@latest"]],
+      canExecute: true,
+      requiresConfirmation: true,
+      riskNotes: []
+    })
+  };
+
+  const code = await main(["update", "sample", "--yes"], io, {
+    confirm: async () => {
+      throw new Error("confirm should not be called with --yes");
+    },
+    findProvider: () => provider,
+    providers: [],
+    runCommand: async (bin, args) => {
+      calls.push([bin, ...args]);
+      return {
+        ok: true,
+        code: 0,
+        stdout: "",
+        stderr: "",
+        error: null
+      };
+    }
+  });
+
+  assert.equal(code, 0);
+  assert.deepEqual(calls, [["npm", "install", "-g", "@example/sample@latest"]]);
+  assert.match(io.stdoutText, /Post-update check/);
+  assert.match(io.stdoutText, /active executable is up to date/);
+  assert.equal(checkIndex, 2);
+});
+
+test("update --json writes one parseable payload with verification", async () => {
+  const io = createIo();
+  const checkResults = [
+    {
+      id: "sample",
+      name: "Sample CLI",
+      installed: true,
+      currentVersion: "1.0.0",
+      latestVersion: "1.1.0",
+      status: "update_available",
+      errors: []
+    },
+    {
+      id: "sample",
+      name: "Sample CLI",
+      installed: true,
+      currentVersion: "1.1.0",
+      latestVersion: "1.1.0",
+      status: "up_to_date",
+      updateAvailable: false,
+      errors: []
+    }
+  ];
+  let checkIndex = 0;
+  const provider = {
+    displayName: "Sample CLI",
+    check: async () => checkResults[checkIndex++],
+    getUpdatePlan: (checkResult) => ({
+      id: "sample",
+      name: "Sample CLI",
+      currentVersion: checkResult.currentVersion,
+      targetVersion: checkResult.latestVersion,
+      strategy: "npm-global",
+      commands: [["npm", "install", "-g", "@example/sample@latest"]],
+      canExecute: true,
+      requiresConfirmation: true,
+      riskNotes: []
+    })
+  };
+
+  const code = await main(["update", "sample", "--yes", "--json"], io, {
+    confirm: async () => true,
+    findProvider: () => provider,
+    providers: [],
+    runCommand: async () => ({
+      ok: true,
+      code: 0,
+      stdout: "",
+      stderr: "",
+      error: null
+    })
+  });
+
+  const payload = JSON.parse(io.stdoutText);
+
+  assert.equal(code, 0);
+  assert.equal(payload.dryRun, false);
+  assert.equal(payload.tool.currentVersion, "1.0.0");
+  assert.equal(payload.verification.status, "up_to_date");
+});
+
+test("update returns exit code 2 when verification still shows update_available", async () => {
+  const io = createIo();
+  const checkResults = [
+    {
+      id: "sample",
+      name: "Sample CLI",
+      installed: true,
+      currentVersion: "1.0.0",
+      latestVersion: "1.1.0",
+      status: "update_available",
+      updateAvailable: true,
+      errors: []
+    },
+    {
+      id: "sample",
+      name: "Sample CLI",
+      installed: true,
+      currentVersion: "1.0.0",
+      latestVersion: "1.1.0",
+      status: "update_available",
+      updateAvailable: true,
+      errors: []
+    }
+  ];
+  let checkIndex = 0;
+  const provider = {
+    displayName: "Sample CLI",
+    check: async () => checkResults[checkIndex++],
+    getUpdatePlan: (checkResult) => ({
+      id: "sample",
+      name: "Sample CLI",
+      currentVersion: checkResult.currentVersion,
+      targetVersion: checkResult.latestVersion,
+      strategy: "npm-global",
+      commands: [["npm", "install", "-g", "@example/sample@latest"]],
+      canExecute: true,
+      requiresConfirmation: true,
+      riskNotes: []
+    })
+  };
+
+  const code = await main(["update", "sample", "--yes"], io, {
+    confirm: async () => true,
+    findProvider: () => provider,
+    providers: [],
+    runCommand: async () => ({
+      ok: true,
+      code: 0,
+      stdout: "",
+      stderr: "",
+      error: null
+    })
+  });
+
+  assert.equal(code, 2);
+  assert.match(io.stdoutText, /active executable still appears outdated/);
+});

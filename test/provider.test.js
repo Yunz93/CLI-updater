@@ -12,7 +12,7 @@ function makeProvider(overrides = {}) {
     versionArgsList: [["--version"]],
     updateCommand: ["npm", "install", "-g", "@example/sample@latest"]
   }, {
-    resolveExecutable: overrides.resolveExecutable ?? (async () => "/usr/local/bin/sample"),
+    resolveExecutable: overrides.resolveExecutable ?? (async () => "/opt/homebrew/lib/node_modules/@example/sample/bin/sample.js"),
     runCommand: overrides.runCommand ?? (async () => ({
       ok: true,
       code: 0,
@@ -186,7 +186,39 @@ test("provider exposes an update plan without executing it", () => {
   assert.equal(plan.requiresConfirmation, true);
 });
 
-test("provider enables codex self-update for standalone installs even when npm-global exists", async () => {
+test("provider does not treat a shadowed executable as npm-global just because npm owns the package", async () => {
+  const provider = makeProvider({
+    resolveExecutable: async () => "/Users/example/.local/bin/sample",
+    runCommand: async (command) => {
+      if (command === "npm") {
+        return {
+          ok: true,
+          code: 0,
+          stdout: JSON.stringify({ dependencies: { "@example/sample": { version: "1.2.3" } } }),
+          stderr: "",
+          error: null
+        };
+      }
+
+      return {
+        ok: true,
+        code: 0,
+        stdout: "sample 1.2.3",
+        stderr: "",
+        error: null
+      };
+    }
+  });
+
+  const result = await provider.check();
+  const plan = provider.getUpdatePlan(result);
+
+  assert.equal(result.installSource, "unknown");
+  assert.equal(plan.strategy, "manual");
+  assert.equal(plan.canExecute, false);
+});
+
+test("provider enables codex fallback update for standalone installs", async () => {
   const provider = createNpmCliProvider({
     id: "codex",
     aliases: ["codex"],
@@ -195,7 +227,7 @@ test("provider enables codex self-update for standalone installs even when npm-g
     packageName: "@openai/codex",
     versionArgsList: [["--version"]],
     updateCommand: ["npm", "install", "-g", "@openai/codex@latest"],
-    selfUpdateCommand: ["codex", "update"]
+    allowFallbackUpdate: true
   }, {
     resolveExecutable: async () => "/Users/example/.codex/packages/standalone/current/codex",
     resolveAllExecutables: async () => ["/Users/example/.codex/packages/standalone/current/codex"],
@@ -227,16 +259,6 @@ test("provider enables codex self-update for standalone installs even when npm-g
         };
       }
 
-      if (command === "/Users/example/.codex/packages/standalone/current/codex" && args[0] === "update") {
-        return {
-          ok: true,
-          code: 0,
-          stdout: "Update Codex to the latest version",
-          stderr: "",
-          error: null
-        };
-      }
-
       return {
         ok: false,
         code: 1,
@@ -248,15 +270,17 @@ test("provider enables codex self-update for standalone installs even when npm-g
   });
 
   const result = await provider.check();
-  assert.equal(result.installSource, "self-update");
+  assert.equal(result.installSource, "unknown");
   assert.equal(result.status, "up_to_date");
 
   const plan = provider.getUpdatePlan(result);
-  assert.equal(plan.strategy, "self-update");
-  assert.deepEqual(plan.commands, [["/Users/example/.codex/packages/standalone/current/codex", "update"]]);
+  assert.equal(plan.strategy, "fallback");
+  assert.equal(plan.canExecute, true);
+  assert.equal(plan.requiresConfirmation, true);
+  assert.deepEqual(plan.commands, [["npm", "install", "-g", "@openai/codex@latest"]]);
 });
 
-test("provider enables codex self-update for Codex.app bundle installs", async () => {
+test("provider enables codex fallback update for Codex.app bundle installs", async () => {
   const provider = createNpmCliProvider({
     id: "codex",
     aliases: ["codex"],
@@ -265,7 +289,7 @@ test("provider enables codex self-update for Codex.app bundle installs", async (
     packageName: "@openai/codex",
     versionArgsList: [["--version"]],
     updateCommand: ["npm", "install", "-g", "@openai/codex@latest"],
-    selfUpdateCommand: ["codex", "update"]
+    allowFallbackUpdate: true
   }, {
     resolveExecutable: async () => "/Applications/Codex.app/Contents/Resources/codex",
     resolveAllExecutables: async () => ["/Applications/Codex.app/Contents/Resources/codex"],
@@ -295,16 +319,6 @@ test("provider enables codex self-update for Codex.app bundle installs", async (
         };
       }
 
-      if (command === "/Applications/Codex.app/Contents/Resources/codex" && args[0] === "update") {
-        return {
-          ok: true,
-          code: 0,
-          stdout: "Update Codex to the latest version",
-          stderr: "",
-          error: null
-        };
-      }
-
       return {
         ok: false,
         code: 1,
@@ -316,13 +330,14 @@ test("provider enables codex self-update for Codex.app bundle installs", async (
   });
 
   const result = await provider.check();
-  assert.equal(result.installSource, "self-update");
+  assert.equal(result.installSource, "unknown");
   assert.equal(result.status, "update_available");
 
   const plan = provider.getUpdatePlan(result);
-  assert.equal(plan.strategy, "self-update");
+  assert.equal(plan.strategy, "fallback");
   assert.equal(plan.canExecute, true);
-  assert.deepEqual(plan.commands, [["/Applications/Codex.app/Contents/Resources/codex", "update"]]);
+  assert.equal(plan.requiresConfirmation, true);
+  assert.deepEqual(plan.commands, [["npm", "install", "-g", "@openai/codex@latest"]]);
 });
 
 test("provider warns when multiple codex installations have different versions", async () => {
@@ -334,7 +349,7 @@ test("provider warns when multiple codex installations have different versions",
     packageName: "@openai/codex",
     versionArgsList: [["--version"]],
     updateCommand: ["npm", "install", "-g", "@openai/codex@latest"],
-    selfUpdateCommand: ["codex", "update"],
+    allowFallbackUpdate: true,
     warnMultipleExecutables: true
   }, {
     resolveExecutable: async () => "/Applications/Codex.app/Contents/Resources/codex",
@@ -353,16 +368,6 @@ test("provider warns when multiple codex installations have different versions",
           ok: true,
           code: 0,
           stdout: JSON.stringify({ name: "lib" }),
-          stderr: "",
-          error: null
-        };
-      }
-
-      if (command === "/Applications/Codex.app/Contents/Resources/codex" && args[0] === "update") {
-        return {
-          ok: true,
-          code: 0,
-          stdout: "Update Codex to the latest version",
           stderr: "",
           error: null
         };
@@ -405,21 +410,22 @@ test("provider warns when multiple codex installations have different versions",
   );
 });
 
-test("provider enables self-update when native installer exposes update command", async () => {
+test("provider uses self-update command for codex when update --help succeeds", async () => {
   const provider = createNpmCliProvider({
-    id: "claude",
-    aliases: ["claude"],
-    displayName: "Claude Code",
-    executable: "claude",
-    packageName: "@anthropic-ai/claude-code",
+    id: "codex",
+    aliases: ["codex"],
+    displayName: "Codex CLI",
+    executable: "codex",
+    packageName: "@openai/codex",
     versionArgsList: [["--version"]],
-    updateCommand: ["npm", "install", "-g", "@anthropic-ai/claude-code@latest"],
-    selfUpdateCommand: ["claude", "update"]
+    updateCommand: ["npm", "install", "-g", "@openai/codex@latest"],
+    selfUpdateCommand: ["codex", "update"],
+    allowFallbackUpdate: true
   }, {
-    resolveExecutable: async () => "/Users/example/.local/bin/claude",
+    resolveExecutable: async () => "/Applications/Codex.app/Contents/Resources/codex",
     getNpmLatestVersion: async () => ({
       ok: true,
-      version: "2.1.145",
+      version: "0.132.0",
       error: null
     }),
     runCommand: async (command, args) => {
@@ -433,21 +439,21 @@ test("provider enables self-update when native installer exposes update command"
         };
       }
 
-      if (command === "/Users/example/.local/bin/claude" && args[0] === "--version") {
+      if (command === "/Applications/Codex.app/Contents/Resources/codex" && args[0] === "--version") {
         return {
           ok: true,
           code: 0,
-          stdout: "2.1.144 (Claude Code)",
+          stdout: "codex-cli 0.131.0-alpha.9",
           stderr: "",
           error: null
         };
       }
 
-      if (command === "/Users/example/.local/bin/claude" && args[0] === "update") {
+      if (command === "/Applications/Codex.app/Contents/Resources/codex" && args[0] === "update" && args[1] === "--help") {
         return {
           ok: true,
           code: 0,
-          stdout: "Usage: claude update|upgrade [options]",
+          stdout: "Usage: codex update",
           stderr: "",
           error: null
         };
@@ -464,13 +470,71 @@ test("provider enables self-update when native installer exposes update command"
   });
 
   const result = await provider.check();
+  const plan = provider.getUpdatePlan(result);
+
   assert.equal(result.installSource, "self-update");
+  assert.equal(plan.strategy, "self-update");
+  assert.equal(plan.canExecute, true);
+  assert.deepEqual(plan.commands, [["/Applications/Codex.app/Contents/Resources/codex", "update"]]);
+});
+
+test("provider uses npm update command for Claude Code when npm global package exists", async () => {
+  const provider = createNpmCliProvider({
+    id: "claude",
+    aliases: ["claude"],
+    displayName: "Claude Code",
+    executable: "claude",
+    packageName: "@anthropic-ai/claude-code",
+    versionArgsList: [["--version"]],
+    updateCommand: ["npm", "install", "-g", "@anthropic-ai/claude-code@latest"]
+  }, {
+    resolveExecutable: async () => "/opt/homebrew/lib/node_modules/@anthropic-ai/claude-code/bin/claude.js",
+    getNpmLatestVersion: async () => ({
+      ok: true,
+      version: "2.1.145",
+      error: null
+    }),
+    runCommand: async (command, args) => {
+      if (command === "npm") {
+        return {
+          ok: true,
+          code: 0,
+          stdout: JSON.stringify({
+            dependencies: { "@anthropic-ai/claude-code": { version: "2.1.144" } }
+          }),
+          stderr: "",
+          error: null
+        };
+      }
+
+      if (command === "/opt/homebrew/lib/node_modules/@anthropic-ai/claude-code/bin/claude.js" && args[0] === "--version") {
+        return {
+          ok: true,
+          code: 0,
+          stdout: "2.1.144 (Claude Code)",
+          stderr: "",
+          error: null
+        };
+      }
+
+      return {
+        ok: false,
+        code: 1,
+        stdout: "",
+        stderr: "",
+        error: "unexpected command"
+      };
+    }
+  });
+
+  const result = await provider.check();
+  assert.equal(result.installSource, "npm-global");
   assert.equal(result.status, "update_available");
 
   const plan = provider.getUpdatePlan(result);
-  assert.equal(plan.strategy, "self-update");
+  assert.equal(plan.strategy, "npm-global");
   assert.equal(plan.canExecute, true);
-  assert.deepEqual(plan.commands, [["/Users/example/.local/bin/claude", "update"]]);
+  assert.deepEqual(plan.commands, [["npm", "install", "-g", "@anthropic-ai/claude-code@latest"]]);
 });
 
 test("provider disables automatic update for unknown install source", () => {

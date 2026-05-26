@@ -27,13 +27,14 @@ export function formatJson(payload) {
 }
 
 export function formatUpdatePlan(plan, dryRun) {
+  const commandHeader = plan.canExecute ? "Commands:" : "Manual command:";
   const lines = [
     dryRun ? "Dry-run update plan" : "Update plan",
     "",
     `${plan.name}: ${plan.currentVersion ?? "unknown"} -> ${plan.targetVersion ?? "latest"}`,
     `Strategy: ${plan.strategy}`,
     "",
-    "Commands:"
+    commandHeader
   ];
 
   for (const command of plan.commands) {
@@ -45,6 +46,38 @@ export function formatUpdatePlan(plan, dryRun) {
     for (const note of plan.riskNotes) {
       lines.push(`  ${note}`);
     }
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+export function formatUpdateVerification(plan, result) {
+  const lines = ["", "Post-update check", ""];
+  const current = result.currentVersion ?? "unknown";
+  const target = plan.targetVersion ?? "latest";
+
+  lines.push(`${result.name}: ${current} -> ${target}    ${result.status}`);
+
+  if (result.errors?.length) {
+    for (const error of result.errors) {
+      lines.push(`  ${error.source}: ${error.message}`);
+    }
+  }
+
+  if (result.status === "update_available") {
+    lines.push("", "Update command completed, but the active executable still appears outdated.");
+    lines.push("Check PATH order or remove older installations that shadow the updated binary.");
+  }
+
+  if (result.errors?.some((error) => error.source === "multiple_installations")) {
+    lines.push("", "Update command completed, but multiple installations remain on PATH.");
+    lines.push("The first matching executable on PATH is the one your shell will run.");
+  }
+
+  if (result.status === "up_to_date") {
+    lines.push("", "Update command completed and the active executable is up to date.");
+  } else if (result.status !== "update_available") {
+    lines.push("", "Update command completed, but the final version status could not be confirmed.");
   }
 
   return `${lines.join("\n")}\n`;

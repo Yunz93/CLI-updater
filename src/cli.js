@@ -2,9 +2,16 @@
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { runCommand } from "./core/exec.js";
-import { formatCheckResults, formatJson, formatProviderList, formatUpdatePlan } from "./core/output.js";
+import { formatCheckResults, formatJson, formatProviderList, formatUpdatePlan, formatUpdateVerification } from "./core/output.js";
 import { confirm } from "./core/prompts.js";
 import { findProvider, providers } from "./providers/index.js";
+
+const defaultRuntime = {
+  confirm,
+  findProvider,
+  providers,
+  runCommand
+};
 
 function getHelp() {
   const toolLines = providers.map((provider) => {
@@ -32,7 +39,7 @@ Options:
 `;
 }
 
-export async function main(argv = process.argv.slice(2), io = process) {
+export async function main(argv = process.argv.slice(2), io = process, runtime = defaultRuntime) {
   const parsed = parseArgs(argv);
 
   if (parsed.flags.help || !parsed.command) {
@@ -41,11 +48,11 @@ export async function main(argv = process.argv.slice(2), io = process) {
   }
 
   if (parsed.command === "check") {
-    return runCheck(parsed, io);
+    return runCheck(parsed, io, runtime);
   }
 
   if (parsed.command === "list") {
-    return runList(parsed, io);
+    return runList(parsed, io, runtime);
   }
 
   if (parsed.command === "doctor") {
@@ -53,7 +60,7 @@ export async function main(argv = process.argv.slice(2), io = process) {
   }
 
   if (parsed.command === "update") {
-    return runUpdate(parsed, io);
+    return runUpdate(parsed, io, runtime);
   }
 
   io.stderr.write(`Unknown command: ${parsed.command}\n\n${getHelp()}`);
@@ -86,10 +93,10 @@ function parseArgs(argv) {
   };
 }
 
-async function runCheck(parsed, io) {
-  const selected = selectProviders(parsed.tool);
+async function runCheck(parsed, io, runtime = defaultRuntime) {
+  const selected = selectProviders(parsed.tool, runtime);
   if (!selected.ok) {
-    return writeUnknownTool(parsed.tool, parsed.flags.json, io);
+    return writeUnknownTool(parsed.tool, parsed.flags.json, io, runtime);
   }
 
   const results = await Promise.all(selected.providers.map((provider) => provider.check()));
@@ -111,10 +118,11 @@ export function filterCheckResults(results, parsed) {
   return results.filter((result) => result.installed);
 }
 
-function runList(parsed, io) {
+function runList(parsed, io, runtime = defaultRuntime) {
+  const providerList = runtime.providers;
   if (parsed.flags.json) {
     io.stdout.write(formatJson({
-      tools: providers.map((provider) => ({
+      tools: providerList.map((provider) => ({
         id: provider.id,
         name: provider.displayName,
         executable: provider.executable,
@@ -124,7 +132,7 @@ function runList(parsed, io) {
       }))
     }));
   } else {
-    io.stdout.write(formatProviderList(providers));
+    io.stdout.write(formatProviderList(providerList));
   }
 
   return 0;
@@ -155,44 +163,58 @@ async function runDoctor(parsed, io) {
   return checks.every((check) => check.ok) ? 0 : 1;
 }
 
-async function runUpdate(parsed, io) {
+async function runUpdate(parsed, io, runtime = defaultRuntime) {
   if (!parsed.tool) {
     io.stderr.write("Missing tool. Usage: agent-cli-updater update <tool> [--dry-run] [--yes]\n");
     return 3;
   }
 
-  const provider = findProvider(parsed.tool);
+  const provider = runtime.findProvider(parsed.tool);
   if (!provider) {
-    return writeUnknownTool(parsed.tool, parsed.flags.json, io);
+    return writeUnknownTool(parsed.tool, parsed.flags.json, io, runtime);
   }
 
   const checkResult = await provider.check();
   const plan = provider.getUpdatePlan(checkResult);
+  const jsonPayload = {
+    tool: checkResult,
+    plan,
+    dryRun: parsed.flags.dryRun
+  };
 
-  if (parsed.flags.json) {
-    io.stdout.write(formatJson({ tool: checkResult, plan, dryRun: parsed.flags.dryRun }));
-  } else {
+  if (!parsed.flags.json) {
     io.stdout.write(formatUpdatePlan(plan, parsed.flags.dryRun));
   }
 
   if (parsed.flags.dryRun) {
+    if (parsed.flags.json) {
+      io.stdout.write(formatJson(jsonPayload));
+    }
     return 0;
   }
 
   if (!checkResult.installed) {
+    if (parsed.flags.json) {
+      io.stdout.write(formatJson(jsonPayload));
+    }
     io.stderr.write(`${provider.displayName} is not installed. Update cannot run.\n`);
     return 1;
   }
 
   if (!plan.canExecute) {
-    io.stderr.write(`${provider.displayName} install source is unknown. Automatic update is disabled.\n`);
+    if (parsed.flags.json) {
+      io.stdout.write(formatJson(jsonPayload));
+    }
     io.stderr.write(`${plan.manualInstructions}\n`);
     return 1;
   }
 
   if (!parsed.flags.yes) {
-    const accepted = await confirm("Run this update command?");
+    const accepted = await runtime.confirm("Run this update command?");
     if (!accepted) {
+      if (parsed.flags.json) {
+        io.stdout.write(formatJson(jsonPayload));
+      }
       io.stderr.write("Update cancelled.\n");
       return 1;
     }
@@ -200,33 +222,61 @@ async function runUpdate(parsed, io) {
 
   for (const command of plan.commands) {
     const [bin, ...args] = command;
-    const result = await runCommand(bin, args, {
+    const result = await runtime.runCommand(bin, args, {
       timeoutMs: plan.timeoutMs ?? 600_000,
       heartbeatMs: parsed.flags.json ? null : 30_000,
       heartbeatLabel: command.join(" "),
       onStdout: parsed.flags.json ? null : (text) => io.stdout.write(text),
       onStderr: parsed.flags.json ? null : (text) => io.stderr.write(text)
     });
-    if (parsed.flags.json && result.stdout) io.stdout.write(result.stdout);
-    if (parsed.flags.json && result.stderr) io.stderr.write(result.stderr);
     if (!result.ok) {
+      if (parsed.flags.json) {
+        io.stdout.write(formatJson({
+          ...jsonPayload,
+          verification: null,
+          commandFailed: true
+        }));
+      }
       io.stderr.write(result.error ? `${result.error}\n` : "Update command failed.\n");
       return 1;
     }
   }
 
-  return 0;
+  const verification = await provider.check();
+  jsonPayload.verification = verification;
+
+  if (parsed.flags.json) {
+    io.stdout.write(formatJson(jsonPayload));
+  } else {
+    io.stdout.write(formatUpdateVerification(plan, verification));
+  }
+
+  return exitCodeFromUpdateVerification(verification);
 }
 
-function selectProviders(tool) {
+export function exitCodeFromUpdateVerification(verification) {
+  if (verification.status === "up_to_date") {
+    return 0;
+  }
+
+  if (verification.updateAvailable || verification.status === "update_available") {
+    return 2;
+  }
+
+  return 1;
+}
+
+function selectProviders(tool, runtime = defaultRuntime) {
+  const providerList = runtime.providers;
+
   if (!tool) {
     return {
       ok: true,
-      providers
+      providers: providerList
     };
   }
 
-  const provider = findProvider(tool);
+  const provider = runtime.findProvider(tool);
   return provider ? {
     ok: true,
     providers: [provider]
@@ -236,11 +286,11 @@ function selectProviders(tool) {
   };
 }
 
-function writeUnknownTool(tool, json, io) {
+function writeUnknownTool(tool, json, io, runtime = defaultRuntime) {
   const payload = {
     error: "unknown_tool",
     message: `Unknown tool: ${tool}`,
-    supportedTools: providers.map((provider) => provider.id)
+    supportedTools: runtime.providers.map((provider) => provider.id)
   };
 
   if (json) {
